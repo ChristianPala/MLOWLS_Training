@@ -4,23 +4,25 @@ This repository contains a PyTorch implementation of the BirdCLEF-2024 winning s
 
 ## 📂 Project Structure
 
+```text
 birdclef25/
-├── data/ # raw metadata & audio files
-│ ├── train.csv
-│ ├── taxonomy.csv
-│ └── train_audio/
-├── experiments/ # MLflow tracking data (mlruns/)
-├── notebooks/ # EDA and prototyping
-├── outputs/ # model checkpoints & artifacts
-├── requirements.txt # Python dependencies
-├── config.yaml # paths & hyperparameters
-├── README.md # this file
-└── src/ # source code package
-│  ├── config.py # Config loader
-│  ├── dataset.py # BirdClefDataset + collate_fn
-│  ├── utils.py # waveform normalize + mel transforms
-│  ├── trainer.py # Trainer class with Rich progress bars
-│  └── train.py # main training script
+├── 📂 data/                     # Raw metadata & audio files
+│   ├── 📜 train.csv
+│   ├── 📜 taxonomy.csv
+│   └── 🎵 train_audio/
+├── 🧪 experiments/            # MLflow tracking data (mlruns/)
+├── 📓 notebooks/              # EDA and prototyping
+├── 📤 outputs/                # Model checkpoints & artifacts
+├── ⚙️ requirements.txt        # Python dependencies
+├── 🛠️ config.yaml             # Paths & hyperparameters
+├── 📖 README.md                 # This file
+└── 🧩 src/                      # Source code package
+    ├── ⚙️ config.py             # Config loader
+    ├── 💾 dataset.py            # BirdClefDataset + collate_fn
+    ├── 🧰 utils.py              # Waveform normalize + mel transforms
+    ├── 🏋️ trainer.py            # Trainer class with Rich progress bars
+    └── 🚂 train.py              # Main training script
+```
 
 ## 🚀 Quick Start
 
