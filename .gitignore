@@ -1,0 +1,11 @@
+/data
+/mlruns
+/outputs
+/.DS_Store
+/.idea
+/experiments
+/.pytest_cache
+/.mypy_cache
+/.coverage
+/.coverage.*
+/.hypothesis
