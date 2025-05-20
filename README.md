@@ -1,6 +1,6 @@
 # BirdCLEF-2025 Training Pipeline
 
-This repository contains a PyTorch implementation of the BirdCLEF-2024 winning solution—adapted to the BirdCLEF-2025 dataset—with MLflow for experiment tracking and Rich for interactive progress bars.
+This repository contains a PyTorch training routine for the BirdCLEF-2025 Kaggle competition and for the Machine Learning in Data 2025 course at SUPSI
 
 ## 📂 Project Structure
 
