@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import torch
 import torch.onnx
@@ -12,7 +12,7 @@ class ONNXConverter(ModelConverter):
 
     def __init__(
         self,
-        input_shape: Tuple[int, ...] = (1, 1, 128, 938),
+        input_shape: tuple[int, ...] = (1, 1, 128, 938),
         opset_version: int = 11,
         dynamic_batch: bool = True,
     ):
@@ -32,7 +32,7 @@ class ONNXConverter(ModelConverter):
         print(f"   Opset version: {opset_version}")
         print(f"   Dynamic batch: {dynamic_batch}")
 
-    def convert(self, model: torch.nn.Module, output_path: str, **kwargs: Any) -> Dict[str, Any]:
+    def convert(self, model: torch.nn.Module, output_path: str, **kwargs: Any) -> dict[str, Any]:
         """Convert PyTorch model to ONNX format."""
         print(f"🚀 Converting to ONNX: {output_path}")
 

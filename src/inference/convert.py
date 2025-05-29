@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from .model_converter import ModelConverter
+from .conversion_pipeline import ConversionPipeline
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,6 +18,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--static-batch", action="store_true", help="Use static batch size (no dynamic batching)"
     )
+    parser.add_argument(
+        "--tolerance", type=float, default=1e-5, help="Validation tolerance (default: 1e-5)"
+    )
 
     return parser.parse_args()
 
@@ -27,7 +30,7 @@ def main() -> None:
     args = parse_args()
 
     print("🔄 BirdCLEF Model → ONNX Converter")
-    print("=" * 50)
+    print("=" * 60)
 
     # Validate input files
     model_path = Path(args.model)
@@ -48,22 +51,22 @@ def main() -> None:
     print(f"⚙️  Config file: {config_path}")
     print(f"📤 Output ONNX: {output_path}")
     print(f"🔍 Validate: {not args.no_validate}")
-    print(f"📊 Opset version: {args.opset}")
-    print(f"🔄 Dynamic batch: {not args.static_batch}")
 
     try:
-        # Convert model
-        results = ModelConverter.convert_best_model(
+        # Use pipeline for conversion
+        results = ConversionPipeline.convert_trained_model(
             model_path=str(model_path),
             config_path=str(config_path),
-            onnx_path=str(output_path),
+            output_path=str(output_path),
             validate=not args.no_validate,
+            # Converter options
+            opset_version=args.opset,
+            dynamic_batch=not args.static_batch,
         )
 
         # Print summary
         print("\n✅ Conversion Summary:")
         print(f"   📁 ONNX file: {output_path}")
-        print(f"   📏 File size: {results['model_info'].get('file_size_mb', 'unknown')} MB")
 
         if "validation" in results and results["validation"].get("is_accurate"):
             max_diff = results["validation"].get("max_difference", 0)
@@ -71,15 +74,7 @@ def main() -> None:
         elif "validation" in results:
             print("   ⚠️  Validation: Failed or skipped")
 
-        # Print model info
-        if "model_info" in results and "inputs" in results["model_info"]:
-            inputs = results["model_info"]["inputs"]
-            outputs = results["model_info"]["outputs"]
-            print(f"   📊 Input shape: {inputs[0]['shape'] if inputs else 'unknown'}")
-            print(f"   📊 Output shape: {outputs[0]['shape'] if outputs else 'unknown'}")
-
         print("\n🎉 Model conversion completed successfully!")
-        print("   Ready for inference with ONNX Runtime")
 
     except Exception as e:
         print(f"\n❌ Conversion failed: {str(e)}")

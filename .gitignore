@@ -93,6 +93,7 @@ logs/
 # MLflow
 mlruns/
 mlartifacts/
+models/
 
 # Temporary files
 *.tmp
