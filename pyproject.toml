@@ -33,6 +33,9 @@ dependencies = [
     "timm>=0.9.0,<1.0.0",
     "mlflow>=2.8.0,<3.0.0",
     "rich>=12.0.0,<14.0.0",
+    "onnx>=1.15.0",
+    "onnxruntime>=1.16.0",
+    "onnxruntime-gpu>=1.16.0"
 ]
 
 [project.optional-dependencies]
@@ -56,6 +59,16 @@ notebook = [
     "notebook>=6.0",
 ]
 
+inference = [
+    "onnx>=1.15.0",
+    "onnxruntime>=1.16.0",
+    "onnxruntime-gpu>=1.16.0",
+    "fastapi>=0.104.0",        # For future API endpoint
+    "uvicorn>=0.24.0",         # ASGI server for FastAPI
+    "python-multipart>=0.0.6", # For file uploads
+]
+
+
 [project.urls]
 Homepage = "https://github.com/christian-pala/MLOWLS_Training"
 Repository = "https://github.com/christian-pala/MLOWLS_Training"
@@ -63,6 +76,8 @@ Issues = "https://github.com/christian-pala/MLOWLS_Training/issues"
 
 [project.scripts]
 mlowls-train = "src.train:main"
+mlowls-convert = "src.inference.convert:main"
+mlowls-predict = "src.inference.predict:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
