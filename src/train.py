@@ -12,38 +12,35 @@ from torch.utils.data import DataLoader
 from src.config import Config
 from src.dataset import BirdClefDataset, collate_fn
 from src.mlflow_logger import MLflowLogger
-from src.trainer import Trainer
+from src.trainer_factory import TrainerFactory
 from src.utils import get_mel_log_transform
 
 
 class LabelSmoothingCrossEntropy(nn.Module):
     """Label smoothing cross entropy for robust training with weak labels."""
 
-    def __init__(self, smoothing: float = 0.1) -> None:
+    def __init__(self, smoothing: float = 0.1):
         super().__init__()
         self.smoothing = smoothing
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """Apply label smoothing."""
         confidence = 1.0 - self.smoothing
-        log_probs = torch.nn.functional.log_softmax(pred, dim=-1)
-        nll_loss = -log_probs.gather(dim=-1, index=target.unsqueeze(1))
-        nll_loss = nll_loss.squeeze(1)
-        smooth_loss = -log_probs.mean(dim=-1)
-        loss = confidence * nll_loss + self.smoothing * smooth_loss
-        return loss.mean()
+        log_probs = torch.nn.functional.log_softmax(pred, dim=1)
+        nll_loss = torch.nn.functional.nll_loss(log_probs, target, reduction="mean")
+        smooth_loss = -log_probs.mean(dim=1).mean()
+        return confidence * nll_loss + self.smoothing * smooth_loss
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Train BirdCLEF model")
-    parser.add_argument(
-        "--config", "-c", type=str, default="config.yaml", help="Path to config YAML"
-    )
+    parser.add_argument("--config", type=str, default="config.yaml", help="Path to config file")
     return parser.parse_args()
 
 
 def main() -> None:
-    """Main training function."""
+    """Main training function using new SOLID architecture."""
     args = parse_args()
     cfg = Config(args.config)
 
@@ -92,11 +89,8 @@ def main() -> None:
         collate_fn=collate_fn,
     )
 
-    # Log dataset stats
-    train_stats = train_ds.get_stats()
-    print(f"Training segments: {train_stats}")
-
     dataloaders = {"train": train_loader}
+
     if val_df is not None:
         val_ds = BirdClefDataset(
             val_df, cfg.train_audio_dir, config=cfg, transform=mel_transform, is_train=False
@@ -110,8 +104,6 @@ def main() -> None:
             collate_fn=collate_fn,
         )
         dataloaders["val"] = val_loader
-        val_stats = val_ds.get_stats()
-        print(f"Validation segments: {val_stats}")
 
     # 5) Instantiate model, loss, optimizer
     model = timm.create_model(
@@ -122,52 +114,42 @@ def main() -> None:
         drop_rate=cfg.dropout,
     )
 
-    # Use label smoothing for robust training given weak labels
     criterion = LabelSmoothingCrossEntropy(smoothing=cfg.label_smoothing)
-
     optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay)
 
     # 6) Device setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # 7) Run and log with MLflow
-    with MLflowLogger(cfg.experiment_name, cfg.run_name) as logger:
-        # Log experiment metadata
-        for tag_key, tag_value in cfg.experiment_tags.items():
-            logger.log_param(f"tag_{tag_key}", tag_value)
+    # 7) Create output directory
+    os.makedirs(cfg.output_dir, exist_ok=True)
 
-        # Log configuration parameters
+    # 8) Start training
+    with MLflowLogger(cfg.experiment_name, cfg.run_name) as logger:
+        # Log configuration
         logger.log_config(cfg)
 
-        # Log dataset statistics
+        # Log dataset stats
+        train_stats = train_ds.get_stats()
         logger.log_dataset_stats(train_stats)
-        if val_df is not None:
-            val_stats_prefixed = {f"val_{k}": v for k, v in val_stats.items()}
-            logger.log_dataset_stats(val_stats_prefixed)
 
-        # Log model info
-        logger.log_param("model_params", sum(p.numel() for p in model.parameters()))
-        logger.log_param(
-            "trainable_params", sum(p.numel() for p in model.parameters() if p.requires_grad)
+        if val_df is not None:
+            val_stats = val_ds.get_stats()
+            logger.log_dataset_stats({f"val_{k}": v for k, v in val_stats.items()})
+
+        # Create trainer using factory
+        trainer = TrainerFactory.create_trainer(
+            model=model,
+            optimizer=optimizer,
+            criterion=criterion,
+            dataloaders=dataloaders,
+            device=device,
+            config=cfg,
+            logger=logger,
         )
 
-        # Create trainer
-        trainer = Trainer(model, optimizer, criterion, dataloaders, device, logger, cfg)
-
-        # Run training
+        # Start training
         trainer.fit(cfg.epochs)
-
-        # Log final artifacts
-        os.makedirs(cfg.output_dir, exist_ok=True)
-        final_path = os.path.join(cfg.output_dir, "final_model.pth")
-        torch.save(model.state_dict(), final_path)
-        logger.log_artifact(final_path, artifact_path="models")
-
-        # Save config for reproducibility
-        config_path = os.path.join(cfg.output_dir, "config.yaml")
-        cfg.save(config_path)
-        logger.log_artifact(config_path, artifact_path="config")
 
     print("Training completed!")
 

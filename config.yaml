@@ -2,7 +2,7 @@ paths:
   train_csv:        data/birdclef-2025/train.csv
   train_audio_dir:  data/birdclef-2025/train_audio
   taxonomy_csv:     data/birdclef-2025/taxonomy.csv
-  output_dir:       outputs
+  output_dir:       output
 
 audio:
   sample_rate: 32000
@@ -21,6 +21,13 @@ training:
   learning_rate: 1e-3
   weight_decay: 1e-4
   val_fraction: 0.1    # ← hold out 10% of train.csv for validation
+  training_strategy: "cutmix"  # or "standard" or "mixup"
+  mixup_alpha: 0.4              # for mixup strategy
+  cutmix_alpha: 1.0             # for cutmix strategy
+  early_stopping_patience: 10
+  accuracy_top_k: 1             # for top-k accuracy
+  auc_average: "macro"          # AUC averaging strategy
+
 
 model:
   backbone: efficientnet_b0

@@ -1,6 +1,6 @@
 # MLOWLS Training - BirdCLEF 2025
 
-A robust training pipeline for BirdCLEF 2025 with weak label learning, featuring multiple overlapping segments, mixup augmentation, and comprehensive experiment tracking.
+A robust training pipeline for BirdCLEF 2025 with SOLID architecture, featuring multiple training strategies, comprehensive metrics, and professional experiment tracking.
 
 ## 📂 Project Structure
 
@@ -19,23 +19,61 @@ MLOWLS_Training/
 ├── 📦 pyproject.toml            # Project dependencies & metadata
 ├── 🔧 .gitignore               # Git ignore patterns
 ├── 📖 README.md                # This file
-└── 🧩 src/                     # Source code package
-    ├── ⚙️ config.py            # Configuration loader
-    ├── 💾 dataset.py           # BirdClefDataset with segment generation
-    ├── 🧰 utils.py             # Audio transforms & augmentations
-    ├── 🏋️ trainer.py           # Trainer with mixup & AUC tracking
-    ├── 📊 mlflow_logger.py     # MLflow experiment tracking
-    └── 🚂 train.py             # Main training script
+└── 🧩 src/                     # Source code package (SOLID Architecture)
+    ├── 🏛️ interfaces/          # Abstract contracts (Dependency Inversion)
+    │   ├── 📋 logger.py         # Logger interface
+    │   ├── 📊 metric_calculator.py # Metric calculation interface
+    │   ├── 💾 model_saver.py    # Model saving interface
+    │   └── 🎯 training_strategy.py # Training strategy interface
+    ├── 📈 metrics/              # Metric implementations
+    │   ├── 🎯 accuracy.py       # Accuracy calculator (with top-k support)
+    │   ├── 📊 auc.py            # AUC calculator (handles missing classes)
+    │   └── 🔢 aggregator.py     # Metrics aggregator
+    ├── 🏋️ training/             # Training orchestration
+    │   ├── 🎲 strategies.py     # Training strategies (Standard, Mixup, CutMix)
+    │   ├── 📅 epoch_trainer.py  # Single epoch training logic
+    │   └── 🎯 trainer.py        # Main training orchestrator
+    ├── 💾 persistence/          # Model saving implementations
+    │   └── 🗄️ model_saver.py    # PyTorch model saver
+    ├── ⚙️ config.py             # Configuration loader
+    ├── 📂 dataset.py            # BirdClefDataset with segment generation
+    ├── 🧰 utils.py              # Audio transforms & augmentations
+    ├── 📊 mlflow_logger.py      # MLflow experiment tracking
+    ├── 🏭 trainer_factory.py    # Dependency injection factory
+    └── 🚂 train.py              # Main training script
 ```
 
 ## ✨ Features
 
-- **🎯 Robust Weak Label Training**: Label smoothing + mixup augmentation for noisy labels
-- **🎵 Multi-Segment Training**: Extract multiple overlapping segments per audio file
-- **📈 Rich Progress Tracking**: Beautiful progress bars with Rich library
-- **🔬 Comprehensive Logging**: MLflow experiment tracking with metrics, parameters, and artifacts
-- **🎛️ Flexible Configuration**: YAML-based configuration management
-- **🧪 Modern Python**: Built with pyproject.toml and proper package structure
+### 🏗️ SOLID Architecture
+- **🔒 Single Responsibility**: Each class has one clear purpose
+- **📖 Open/Closed**: Easy to extend with new strategies and metrics
+- **🔄 Liskov Substitution**: Strategies and metrics are interchangeable
+- **🏛️ Interface Segregation**: Clean, focused interfaces
+- **⬇️ Dependency Inversion**: High-level modules don't depend on low-level details
+
+### 🎯 Training Strategies
+- **🎪 Standard Training**: Classic supervised learning
+- **🎭 Mixup Training**: Data augmentation mixing samples and labels
+- **✂️ CutMix Training**: Spatial augmentation for spectrograms
+- **🔧 Extensible**: Easy to add new training strategies
+
+### 📊 Comprehensive Metrics
+- **🎯 Accuracy**: Standard and top-k accuracy
+- **📈 AUC-ROC**: Multi-class with proper missing class handling
+- **🔢 Aggregated**: Unified metrics calculation and reporting
+- **📋 Configurable**: Easy to add custom metrics
+
+### 🎵 Audio Processing
+- **🔄 Multi-Segment Training**: Extract multiple overlapping segments per audio file
+- **🎛️ SpecAugment**: Frequency and time masking for robustness
+- **⚙️ Configurable**: Flexible audio preprocessing parameters
+
+### 📈 Experiment Tracking
+- **🔬 MLflow Integration**: Professional experiment tracking
+- **📊 Rich Progress Bars**: Beautiful real-time training progress
+- **💾 Model Artifacts**: Automatic model saving with metadata
+- **📋 Configuration Logging**: Full reproducibility
 
 ## 🚀 Quick Start
 
@@ -51,7 +89,6 @@ MLOWLS_Training/
 ```bash
 git clone https://github.com/christian-pala/MLOWLS_Training.git
 cd MLOWLS_Training
-
 
 # Create virtual environment
 python -m venv .venv
@@ -94,25 +131,42 @@ cd ..
 Edit `config.yaml` to customize:
 
 ```yaml
-# Key settings
-audio:
-  segment_length: 30.0      # Segment length in seconds
-  overlap: 0.5              # 50% overlap between segments
-  max_segments_per_file: 5  # Max segments per audio file
-
+# Training strategy configuration
 training:
   batch_size: 32
   epochs: 10
-  mixup_alpha: 0.4          # Mixup strength
-  label_smoothing: 0.1      # Label smoothing factor
+  learning_rate: 1e-3
+  weight_decay: 1e-4
 
+  # Choose training strategy
+  training_strategy: "standard"    # "standard", "mixup", or "cutmix"
+  mixup_alpha: 0.4                # For mixup strategy
+  cutmix_alpha: 1.0               # For cutmix strategy
+
+  # Early stopping
+  early_stopping_patience: 10
+
+# Metrics configuration
+training:
+  accuracy_top_k: 1               # Top-k accuracy (1 = standard accuracy)
+  auc_average: "macro"            # AUC averaging strategy
+
+# Audio processing
+audio:
+  segment_length: 30.0            # Segment length in seconds
+  overlap: 0.5                    # 50% overlap between segments
+  max_segments_per_file: 5        # Max segments per audio file
+
+# Model configuration
 model:
   backbone: efficientnet_b0
+  num_classes: 206
   dropout: 0.3
 
+# Experiment tracking
 experiment:
   name: birdclef25_robust_train
-  run_name: efficientnet_b0_baseline
+  run_name: null                  # Auto-generated if null
 ```
 
 ### 5. Train Model
@@ -137,51 +191,95 @@ mlflow ui
 # Open browser to http://localhost:5000
 ```
 
-## 🎯 Training Strategy
+## 🎯 Training Strategies
 
-This pipeline implements a robust approach for handling weak labels in audio classification:
+The SOLID architecture makes it easy to switch between different training approaches:
 
-1. **Multi-Segment Extraction**: Each audio file is split into multiple overlapping segments
-2. **Mixup Augmentation**: Combines pairs of examples and their labels during training
-3. **Label Smoothing**: Reduces overconfidence on potentially mislabeled samples
-4. **SpecAugment**: Frequency and time masking for spectrogram robustness
-5. **Comprehensive Metrics**: Tracks accuracy, loss, and AUC-ROC for proper evaluation
-
-## 🔧 Customization
-
-### Change Model Architecture
-```yaml
-model:
-  backbone: efficientnet_b3  # or convnext_base, regnetx_008, etc.
-  num_classes: 206
-  dropout: 0.3
-```
-
-### Adjust Audio Processing
-```yaml
-audio:
-  sample_rate: 32000
-  n_mels: 128               # Mel-spectrogram bins
-  segment_length: 20.0      # Shorter/longer segments
-  overlap: 0.75             # More overlap for more data
-```
-
-### Modify Training Strategy
+### 🎪 Standard Training
 ```yaml
 training:
-  mixup_alpha: 0.8          # Stronger mixup
-  label_smoothing: 0.2      # More smoothing
-  learning_rate: 5e-4       # Different learning rate
+  training_strategy: "standard"
+```
+Classic supervised learning without augmentation.
+
+### 🎭 Mixup Training
+```yaml
+training:
+  training_strategy: "mixup"
+  mixup_alpha: 0.4              # Controls mixing strength
+```
+Combines pairs of examples and their labels during training for better generalization.
+
+### ✂️ CutMix Training
+```yaml
+training:
+  training_strategy: "cutmix"
+  cutmix_alpha: 1.0             # Controls cut region size
+```
+Spatial augmentation that cuts and pastes regions between spectrograms.
+
+## 📊 Metrics System
+
+The modular metrics system provides comprehensive evaluation:
+
+### 🎯 Accuracy Metrics
+```yaml
+training:
+  accuracy_top_k: 1             # Standard accuracy
+  accuracy_top_k: 5             # Top-5 accuracy for harder evaluation
 ```
 
-## 📊 Experiment Tracking
+### 📈 AUC Metrics
+```yaml
+training:
+  auc_average: "macro"          # Macro-averaged AUC
+  auc_average: "micro"          # Micro-averaged AUC
+  auc_average: "weighted"       # Weighted AUC
+```
 
-All experiments are automatically tracked with MLflow:
+## 🔧 Architecture Benefits
 
-- **Parameters**: All config values, model architecture details
-- **Metrics**: Training/validation loss, accuracy, AUC-ROC per epoch
-- **Artifacts**: Best model weights, final model, configuration files
-- **Dataset Stats**: Number of segments, class distribution, etc.
+### 🧪 Easy Testing
+```python
+# Test individual components
+from src.metrics.accuracy import AccuracyCalculator
+from src.training.strategies import MixupTrainingStrategy
+
+# Each component can be tested in isolation
+accuracy_calc = AccuracyCalculator(top_k=5)
+mixup_strategy = MixupTrainingStrategy(alpha=0.4)
+```
+
+### 🔄 Easy Extension
+```python
+# Add a new training strategy
+class SpecAugmentStrategy(TrainingStrategy):
+    def train_step(self, model, batch, optimizer, criterion, device):
+        # Your implementation here
+        pass
+
+# Add a new metric
+class F1Calculator(MetricCalculator):
+    def calculate(self, predictions, labels):
+        # Your F1 implementation here
+        pass
+```
+
+### ⚙️ Flexible Configuration
+```python
+# Create trainer with factory pattern
+from src.trainer_factory import TrainerFactory
+
+trainer = TrainerFactory.create_trainer(
+    model=model,
+    optimizer=optimizer,
+    criterion=criterion,
+    dataloaders=dataloaders,
+    device=device,
+    config=config,
+    logger=logger
+)
+```
 
 ## 🧪 Development
 
@@ -202,10 +300,65 @@ pytest
 
 ## 📈 Performance Tips
 
-1. **GPU Memory**: Reduce `batch_size` if you encounter OOM errors
-2. **Training Speed**: Reduce `max_segments_per_file` for faster data loading
-3. **Model Size**: Use smaller backbones (efficientnet_b0 vs b3) for faster training
-4. **Validation**: Increase `val_fraction` to 0.2 for more reliable validation metrics
+1. **🎯 Strategy Selection**:
+   - Use `"standard"` for baseline
+   - Use `"mixup"` for better generalization
+   - Use `"cutmix"` for spatial robustness
+
+2. **💾 GPU Memory**:
+   - Reduce `batch_size` if you encounter OOM errors
+   - Use smaller backbones (efficientnet_b0 vs b3)
+
+3. **⚡ Training Speed**:
+   - Reduce `max_segments_per_file` for faster data loading
+   - Use `accuracy_top_k: 1` for faster metric calculation
+
+4. **📊 Validation**:
+   - Increase `val_fraction` to 0.2 for more reliable validation metrics
+   - Use `early_stopping_patience` to prevent overfitting
+
+## 🏗️ Extending the System
+
+### Adding a New Training Strategy
+
+1. **Create strategy class**:
+```python
+# src/training/strategies.py
+class YourStrategy(TrainingStrategy):
+    def train_step(self, model, batch, optimizer, criterion, device):
+        # Your implementation
+        pass
+```
+
+2. **Update factory**:
+```python
+# src/trainer_factory.py
+elif strategy_name == 'your_strategy':
+    return YourStrategy(**kwargs)
+```
+
+3. **Configure in YAML**:
+```yaml
+training:
+  training_strategy: "your_strategy"
+```
+
+### Adding a New Metric
+
+1. **Create metric class**:
+```python
+# src/metrics/your_metric.py
+class YourMetric(MetricCalculator):
+    def calculate(self, predictions, labels):
+        # Your implementation
+        return metric_value
+```
+
+2. **Update factory**:
+```python
+# src/trainer_factory.py
+aggregator.add_metric(YourMetric())
+```
 
 ## 🤝 Contributing
 
@@ -221,6 +374,6 @@ This project is released under the MIT License. See `LICENSE` file for details.
 
 ## 🙏 Acknowledgments
 
-- Built for the Machine Learning in Data 2025 course at SUPSI
+- Built for the Machine Learning in Data Operations 2025 course at SUPSI / ZHAW
 - Uses the BirdCLEF 2025 dataset from Kaggle
-- Implements ideas from robust learning literature for weak supervision
+- Implements SOLID principles for maintainable and extensible code
