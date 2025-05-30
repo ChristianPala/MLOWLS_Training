@@ -13,10 +13,10 @@ class MelSpectrogramGenerator(SpectrogramGenerator):
         self,
         sample_rate: int = 32000,
         n_mels: int = 128,
-        n_fft: int = 2048,
-        hop_length: int = 512,
-        fmin: float = 50.0,
-        fmax: float = 14000.0,
+        n_fft: int = 1024,
+        hop_length: int = 320,
+        fmin: float = 20.0,
+        fmax: float = 16000.0,
         power: float = 2.0,
     ) -> None:
         """Initialize mel-spectrogram generator."""
@@ -49,9 +49,10 @@ class MelSpectrogramGenerator(SpectrogramGenerator):
         )
 
         # Convert to log scale
-        log_mel_spec = librosa.power_to_db(mel_spec, ref=np.max)
+        mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
 
-        return log_mel_spec
+        # Add channel dimension for model input: (n_mels, n_frames) -> (1, n_mels, n_frames)
+        return mel_spec_db[np.newaxis, :, :]
 
     def configure(self, **kwargs: Any) -> None:
         """Configure spectrogram parameters."""

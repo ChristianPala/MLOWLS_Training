@@ -8,31 +8,53 @@ class AudioProcessingFactory:
     """Factory for creating audio processing pipeline."""
 
     @staticmethod
-    def create_processor(config: Config) -> OGGAudioProcessor:
-        """Create audio processor from configuration."""
+    def create_processor(config: Config, target_frames: int | None = None) -> OGGAudioProcessor:
+        """Create audio processor from config.
+
+        Args:
+            config: Training configuration
+            target_frames: Target frame count for fixed-size spectrograms
+        """
         print("🏭 Creating audio processing pipeline...")
 
-        # Create segmenter
-        segmenter = OverlapSegmenter(
-            segment_length=getattr(config, "segment_length", 30.0),
-            overlap=getattr(config, "overlap", 0.5),
-        )
+        audio_config = getattr(config, "audio", {})
 
-        # Create spectrogram generator
+        sample_rate = audio_config.get("sample_rate", 32000)
+        segment_length = audio_config.get("segment_length", 30.0)
+        overlap = audio_config.get("overlap", 0.5)
+
+        n_mels = audio_config.get("n_mels", 128)
+        n_fft = audio_config.get("n_fft", 1024)
+        hop_length = audio_config.get("hop_length", 320)
+        fmin = audio_config.get("fmin", 20.0)
+        fmax = audio_config.get("fmax", 16000.0)
+
+        print("📊 Audio parameters from config:")
+        print(f"   Sample rate: {sample_rate}Hz")
+        print(f"   N_FFT: {n_fft}")
+        print(f"   Hop length: {hop_length}")
+        print(f"   Mel bands: {n_mels}")
+        print(f"   Freq range: {fmin}-{fmax}Hz")
+        print(f"   Segment length: {segment_length}s")
+        # Create segmenter
+        segmenter = OverlapSegmenter(segment_length=segment_length, overlap=overlap)
+
+        # Create spectrogram generator with target frames
         spectrogram_generator = MelSpectrogramGenerator(
-            sample_rate=getattr(config, "sample_rate", 32000),
-            n_mels=getattr(config, "n_mels", 128),
-            n_fft=getattr(config, "n_fft", 2048),
-            hop_length=getattr(config, "hop_length", 512),
-            fmin=getattr(config, "fmin", 50.0),
-            fmax=getattr(config, "fmax", 14000.0),
+            sample_rate=sample_rate,
+            n_mels=n_mels,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            fmin=fmin,
+            fmax=fmax,
+            power=2.0,
         )
 
         # Create processor
         processor = OGGAudioProcessor(
             segmenter=segmenter,
             spectrogram_generator=spectrogram_generator,
-            target_sample_rate=getattr(config, "sample_rate", 32000),
+            target_sample_rate=sample_rate,
         )
 
         print("✅ Audio processing pipeline ready!")

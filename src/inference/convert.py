@@ -1,5 +1,4 @@
 import argparse
-from pathlib import Path
 
 from .conversion_pipeline import ConversionPipeline
 
@@ -29,52 +28,32 @@ def main() -> None:
     """Main conversion function."""
     args = parse_args()
 
-    print("🔄 BirdCLEF Model → ONNX Converter")
-    print("=" * 60)
-
-    # Validate input files
-    model_path = Path(args.model)
-    config_path = Path(args.config)
-
-    if not model_path.exists():
-        raise FileNotFoundError(f"Model file not found: {model_path}")
-
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
-
-    # Set output path
-    output_path = Path(args.output)
-    if not output_path.suffix:
-        output_path = output_path.with_suffix(".onnx")
-
-    print(f"📂 Input model: {model_path}")
-    print(f"⚙️  Config file: {config_path}")
-    print(f"📤 Output ONNX: {output_path}")
-    print(f"🔍 Validate: {not args.no_validate}")
+    print("🔄 Starting model conversion...")
+    print(f"   Model: {args.model}")
+    print(f"   Config: {args.config}")
+    print(f"   Output: {args.output}")
 
     try:
-        # Use pipeline for conversion
-        results = ConversionPipeline.convert_trained_model(
-            model_path=str(model_path),
-            config_path=str(config_path),
-            output_path=str(output_path),
+        results = ConversionPipeline.convert_model(
+            model_path=args.model,
+            config_path=args.config,
+            output_path=args.output,
             validate=not args.no_validate,
-            # Converter options
             opset_version=args.opset,
             dynamic_batch=not args.static_batch,
         )
 
-        # Print summary
-        print("\n✅ Conversion Summary:")
-        print(f"   📁 ONNX file: {output_path}")
+        print("\n🎉 Conversion completed successfully!")
+        print(f"📁 ONNX model: {results['output_path']}")
 
-        if "validation" in results and results["validation"].get("is_accurate"):
-            max_diff = results["validation"].get("max_difference", 0)
-            print(f"   ✅ Validation: Passed (max diff: {max_diff:.2e})")
-        elif "validation" in results:
-            print("   ⚠️  Validation: Failed or skipped")
-
-        print("\n🎉 Model conversion completed successfully!")
+        if "validation" in results:
+            validation = results["validation"]
+            if validation.get("is_accurate", False):
+                max_diff = validation.get("max_difference", "unknown")
+                print(f"✅ Validation passed (max diff: {max_diff:.2e})")
+            else:
+                error_msg = validation.get("error", "Validation failed")
+                print(f"⚠️  Validation failed: {error_msg}")
 
     except Exception as e:
         print(f"\n❌ Conversion failed: {str(e)}")

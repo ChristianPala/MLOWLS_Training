@@ -1,9 +1,11 @@
+from pathlib import Path
 from typing import Any, Optional
 
 import torch
 
 from ..interfaces.metadata_handler import MetadataHandler
 from ..interfaces.model_converter import ModelConverter
+from ..interfaces.model_loader import ModelLoader
 from ..interfaces.model_validator import ModelValidator
 
 
@@ -13,22 +15,26 @@ class ModelConversionService:
     def __init__(
         self,
         converter: ModelConverter,
+        model_loader: ModelLoader,
         validator: Optional[ModelValidator] = None,
         metadata_handler: Optional[MetadataHandler] = None,
-    ):
+    ) -> None:
         """Initialize conversion service.
 
         Args:
             converter: Model converter implementation
+            model_loader: Model loader implementation
             validator: Optional model validator
             metadata_handler: Optional metadata handler
         """
         self.converter = converter
+        self.model_loader = model_loader
         self.validator = validator
         self.metadata_handler = metadata_handler
 
         print("🏭 Model Conversion Service initialized")
         print(f"   Converter: {type(converter).__name__}")
+        print(f"   Model Loader: {type(model_loader).__name__}")
         print(f"   Validator: {type(validator).__name__ if validator else 'None'}")
         print(
             f"   Metadata Handler: {type(metadata_handler).__name__ if metadata_handler else 'None'}"
@@ -36,42 +42,42 @@ class ModelConversionService:
 
     def convert_model(
         self,
-        model: torch.nn.Module,
+        model_path: str,
+        config_path: str,
         output_path: str,
         validate: bool = True,
-        save_metadata: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Convert model with validation and metadata handling.
+        """Convert model with full pipeline."""
+        print("🔄 Starting model conversion...")
+        print(f"   Model: {Path(model_path).name}")
+        print(f"   Config: {Path(config_path).name}")
+        print(f"   Output: {output_path}")
 
-        Args:
-            model: Model to convert
-            output_path: Output file path
-            validate: Whether to validate conversion
-            save_metadata: Whether to save metadata
-            **kwargs: Additional conversion options
-
-        Returns:
-            Conversion results
-        """
-        print(f"🔄 Starting model conversion to: {output_path}")
+        # Load model
+        model = self.model_loader.load_model(model_path, config_path=config_path)
 
         # Convert model
         conversion_results = self.converter.convert(model, output_path, **kwargs)
 
-        # Validate if requested and validator available
-        if validate and self.validator:
-            # Create test input for validation
-            # Assume converter has input_shape attribute
-            if hasattr(self.converter, "input_shape"):
-                test_input = torch.randn(self.converter.input_shape)
-                validation_results = self.validator.validate(model, output_path, test_input)
-                conversion_results["validation"] = validation_results
+        conversion_results["original_model"] = {
+            "model_path": model_path,
+            "config_path": config_path,
+        }
 
-        # Save metadata if requested and handler available
-        if save_metadata and self.metadata_handler:
+        # Validate if requested
+        if validate and self.validator:
+            print("🔍 Validating converted model...")
+            input_shape = (1, 1, 128, 2997)
+            test_input = torch.randn(input_shape)
+            validation_results = self.validator.validate(model, output_path, test_input)
+            conversion_results["validation"] = validation_results
+
+        # Save metadata
+        if self.metadata_handler:
             metadata_path = output_path.replace(".onnx", "_conversion.json")
             self.metadata_handler.save_metadata(conversion_results, metadata_path)
+            print(f"💾 Conversion metadata saved: {metadata_path}")
 
-        print("✅ Model conversion completed!")
+        print("✅ Model conversion completed successfully!")
         return conversion_results

@@ -190,10 +190,25 @@ mlowls-convert \
   --model outputs/best_model.pth \
   --config config.yaml \
   --output models/birdclef_best.onnx \
-  --input-shape 1 1 128 938 \
-  --opset-version 11 \
-  --dynamic-batch
+  --opset 11
 ```
+
+### 🔄 Conversion Command
+```bash
+mlowls-convert \
+  --model outputs/best_model.pth \
+  --config config.yaml \
+  --output models/birdclef_best.onnx
+```
+
+**Options:**
+- `--model`: Path to PyTorch model checkpoint (required)
+- `--config`: Path to training config (required)
+- `--output`: Output ONNX model path (required)
+- `--opset`: ONNX opset version (default: 11)
+- `--no-validate`: Skip model validation
+- `--static-batch`: Use static batch size (default: dynamic)
+- `--tolerance`: Validation tolerance (default: 1e-5)
 
 ### 3. Run Inference
 
