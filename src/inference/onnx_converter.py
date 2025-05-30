@@ -5,6 +5,7 @@ import torch
 import torch.onnx
 
 from ..config import Config
+from ..dataset import BirdClefDataset
 from ..interfaces.model_converter import ModelConverter
 
 
@@ -18,33 +19,33 @@ class ONNXConverter(ModelConverter):
         opset_version: int = 11,
         dynamic_batch: bool = True,
     ) -> None:
-        """Initialize ONNX converter.
+        """Initialize ONNX converter."""
+        if input_shape is None:
+            if config is None:
+                raise ValueError("Either input_shape or config must be provided")
 
-        Args:
-            input_shape: Expected input shape (if None, calculate from config)
-            config: Training config to calculate shape from
-            opset_version: ONNX opset version
-            dynamic_batch: Enable dynamic batch size
-        """
-        if input_shape is None and config is not None:
-            # Calculate input shape from NESTED config
-            # The config has audio parameters under 'audio:' section
-            audio_config = getattr(config, "audio", {})
+            # Calculate input shape using EXACT training logic
+            print("📊 Calculating input shape from training pipeline...")
 
-            sample_rate = audio_config.get("sample_rate", 32000)
-            segment_length = audio_config.get("segment_length", 30.0)
-            n_fft = audio_config.get("n_fft", 1024)
-            hop_length = audio_config.get("hop_length", 320)
-            n_mels = audio_config.get("n_mels", 128)
+            temp_dataset = BirdClefDataset(
+                data_source=None,
+                audio_dir="",
+                config=config,
+                inference_mode=True,
+            )
 
-            n_samples = int(segment_length * sample_rate)
-            n_frames = 1 + (n_samples - n_fft) // hop_length
+            # Generate a test segment to get actual dimensions
+            test_segment = torch.randn(temp_dataset.segment_samples)
+            test_spec = temp_dataset.transform_audio_segment(test_segment)
 
-            input_shape = (1, 1, n_mels, n_frames)
-            print(f"📊 Calculated input shape from config: {input_shape}")
-            print(f"   Using audio config: sr={sample_rate}, n_fft={n_fft}, hop={hop_length}")
+            # Input shape: (batch, channels, mels, frames)
+            input_shape = (1, 1, test_spec.shape[0], test_spec.shape[1])
 
-        self.input_shape = input_shape or (1, 1, 128, 938)  # fallback
+            print(f"📊 Calculated input shape from training pipeline: {input_shape}")
+            print(f"   Segment samples: {temp_dataset.segment_samples}")
+            print(f"   Output spec shape: {test_spec.shape}")
+
+        self.input_shape = input_shape
         self.opset_version = opset_version
         self.dynamic_batch = dynamic_batch
 

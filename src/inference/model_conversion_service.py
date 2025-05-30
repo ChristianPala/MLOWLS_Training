@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 import torch
 
+from ..config import Config
 from ..interfaces.metadata_handler import MetadataHandler
 from ..interfaces.model_converter import ModelConverter
 from ..interfaces.model_loader import ModelLoader
@@ -46,6 +47,7 @@ class ModelConversionService:
         config_path: str,
         output_path: str,
         validate: bool = True,
+        config: Optional[Config] = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Convert model with full pipeline."""
@@ -53,6 +55,10 @@ class ModelConversionService:
         print(f"   Model: {Path(model_path).name}")
         print(f"   Config: {Path(config_path).name}")
         print(f"   Output: {output_path}")
+
+        # Load config if not provided
+        if config is None:
+            config = Config(config_path)
 
         # Load model
         model = self.model_loader.load_model(model_path, config_path=config_path)
@@ -68,14 +74,29 @@ class ModelConversionService:
         # Validate if requested
         if validate and self.validator:
             print("🔍 Validating converted model...")
-            input_shape = (1, 1, 128, 2997)
+
+            # Use config to determine input shape
+            input_shape = (1, 1, config.n_mels, 3001)  # batch_size, channels, n_mels, time_frames
             test_input = torch.randn(input_shape)
+            print(f"🔧 Using config-based input shape: {input_shape}")
+            print(f"🔧 Created test input with shape: {test_input.shape}")
+
             validation_results = self.validator.validate(model, output_path, test_input)
             conversion_results["validation"] = validation_results
 
-        # Save metadata
+        # Save metadata with config info
         if self.metadata_handler:
             metadata_path = output_path.replace(".onnx", "_conversion.json")
+
+            # Add config details to conversion results
+            conversion_results["config_info"] = {
+                "n_mels": config.n_mels,
+                "sample_rate": config.sample_rate,
+                "n_fft": config.n_fft,
+                "hop_length": config.hop_length,
+                "input_shape": input_shape,
+            }
+
             self.metadata_handler.save_metadata(conversion_results, metadata_path)
             print(f"💾 Conversion metadata saved: {metadata_path}")
 

@@ -54,19 +54,30 @@ class ONNXPredictor(Predictor):
         except Exception as e:
             raise RuntimeError(f"ONNX prediction failed: {str(e)}")
 
-    def predict_batch(self, inputs: list[np.ndarray]) -> list[np.ndarray]:
-        """Make predictions on batch of inputs."""
-        results = []
+    def predict_batch(self, spectrograms: np.ndarray) -> list[np.ndarray]:
+        """Predict batch of spectrograms."""
 
-        for input_array in inputs:
-            # Add batch dimension if needed
-            if input_array.ndim == 3:  # (C, H, W) → (1, C, H, W)
-                input_array = input_array[np.newaxis, :]
+        # Ensure input is float32
+        if spectrograms.dtype != np.float32:
+            spectrograms = spectrograms.astype(np.float32)
 
-            prediction = self.predict(input_array)
-            results.append(prediction)
+        try:
+            # Run ONNX inference on the entire batch
+            raw_predictions = self.session.run(None, {self.input_name: spectrograms})[0]
 
-        return results
+            # Apply softmax to convert logits to probabilities
+            def softmax(x: np.ndarray) -> np.ndarray:
+                exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))  # Numerical stability
+                return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
+
+            # Normalize each prediction
+            normalized_predictions = softmax(raw_predictions)
+
+            # Return as list of individual predictions
+            return [normalized_predictions[i] for i in range(len(normalized_predictions))]
+
+        except Exception as e:
+            raise RuntimeError(f"ONNX batch prediction failed: {str(e)}")
 
     def get_model_info(self) -> dict[str, Any]:
         """Get model information."""

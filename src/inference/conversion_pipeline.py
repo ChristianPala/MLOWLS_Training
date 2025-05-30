@@ -1,7 +1,3 @@
-"""
-Complete model conversion pipeline with all components.
-"""
-
 from typing import Any
 
 from ..config import Config

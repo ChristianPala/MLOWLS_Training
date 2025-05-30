@@ -37,7 +37,8 @@ class BirdCLEFPredictionPipeline:
         # Process audio
         spectrograms, timestamps = self.audio_processor.process_file(audio_path)
 
-        if not spectrograms:
+        # Fix: spectrograms is np.ndarray, not list
+        if spectrograms.size == 0:  # This works for np.ndarray
             return {
                 "file_path": audio_path,
                 "error": "No valid segments generated",
@@ -70,7 +71,7 @@ class BirdCLEFPredictionPipeline:
         # Process audio bytes
         spectrograms, timestamps = self.audio_processor.process_bytes(audio_bytes)
 
-        if not spectrograms:
+        if spectrograms.size == 0:
             return {"filename": filename, "error": "No valid segments generated", "predictions": []}
 
         # Get predictions

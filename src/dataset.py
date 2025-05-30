@@ -35,18 +35,24 @@ class BirdClefDataset(Dataset):
 
     def __init__(
         self,
-        data_source: Union[pd.DataFrame, str],
+        data_source: Union[pd.DataFrame, str, None],
         audio_dir: str,
         config: Config,
         transform: Optional[torch.nn.Module] = None,
         is_train: bool = True,
+        inference_mode: bool = False,
     ) -> None:
-        self.df = (
-            data_source.copy()
-            if isinstance(data_source, pd.DataFrame)
-            else pd.read_csv(data_source)
-        )
-        assert "label_idx" in self.df.columns, "DataFrame must contain 'label_idx'."
+        if inference_mode:
+            self.df = None
+            self.segments = []
+        else:
+            self.df = (
+                data_source.copy()
+                if isinstance(data_source, pd.DataFrame)
+                else pd.read_csv(data_source)
+            )
+            assert "label_idx" in self.df.columns, "DataFrame must contain 'label_idx'."
+            self.segments = self._create_segments()
 
         self.audio_dir = audio_dir
         self.config = config
@@ -66,12 +72,53 @@ class BirdClefDataset(Dataset):
 
         self.spec_augment = get_spectrogram_augmentations(is_train=self.is_train)
 
-        self.segments = self._create_segments()
+    @property
+    def sample_rate(self) -> int:
+        """Get sample rate from config."""
+        return getattr(self.config, "sample_rate", 32000)
+
+    @property
+    def segment_length(self) -> float:
+        """Get segment length from config."""
+        return getattr(self.config, "segment_length", 30.0)
+
+    @property
+    def overlap(self) -> float:
+        """Get overlap from config."""
+        return getattr(self.config, "overlap", 0.5)
+
+    @property
+    def n_fft(self) -> int:
+        """Get n_fft from config."""
+        return getattr(self.config, "n_fft", 1024)
+
+    @property
+    def hop_length(self) -> int:
+        """Get hop_length from config."""
+        return getattr(self.config, "hop_length", 320)
+
+    @property
+    def n_mels(self) -> int:
+        """Get n_mels from config."""
+        return getattr(self.config, "n_mels", 128)
+
+    @property
+    def fmin(self) -> float:
+        """Get fmin from config."""
+        return getattr(self.config, "fmin", 20.0)
+
+    @property
+    def fmax(self) -> float:
+        """Get fmax from config."""
+        return getattr(self.config, "fmax", 16000.0)
 
     def _create_segments(self) -> list[dict[str, Any]]:
         """Create multiple overlapping segments from each audio file."""
         segments: list[dict[str, Any]] = []
         hop_samples = int(self.segment_samples * (1 - self.config.overlap))
+
+        if self.df is None:
+            return segments
 
         console.log(
             f"[bold blue]Creating segments: {self.config.segment_length}s length, "
@@ -213,6 +260,17 @@ class BirdClefDataset(Dataset):
 
     def get_stats(self) -> dict[str, Union[int, float]]:
         """Get dataset statistics."""
+        # Fix: Check if df is None
+        if self.df is None:
+            return {
+                "original_files": 0,
+                "total_segments": len(self.segments),
+                "avg_segments_per_file": 0.0,
+                "unique_classes": 0,
+                "min_segments_per_class": 0,
+                "max_segments_per_class": 0,
+            }
+
         class_counts: dict[int, int] = {}
         for segment in self.segments:
             label = segment["label_idx"]
@@ -221,7 +279,7 @@ class BirdClefDataset(Dataset):
         stats = {
             "original_files": len(self.df),
             "total_segments": len(self.segments),
-            "avg_segments_per_file": len(self.segments) / len(self.df),
+            "avg_segments_per_file": len(self.segments) / len(self.df) if len(self.df) > 0 else 0.0,
             "unique_classes": len(class_counts),
             "min_segments_per_class": min(class_counts.values()) if class_counts else 0,
             "max_segments_per_class": max(class_counts.values()) if class_counts else 0,
@@ -229,3 +287,51 @@ class BirdClefDataset(Dataset):
 
         logger.info(f"Dataset stats: {stats}")
         return stats
+
+    def load_audio_for_inference(self, audio_path: str) -> torch.Tensor:
+        """Load and preprocess audio for inference (without segmentation)."""
+        try:
+            waveform, sr = torchaudio.load(audio_path)
+        except Exception as e:
+            logger.error(f"Failed to load audio file {audio_path}: {e}")
+            raise
+
+        # Resample if needed
+        if sr != self.config.sample_rate:
+            resampler = torchaudio.transforms.Resample(sr, self.config.sample_rate)
+            waveform = resampler(waveform)
+
+        # Convert to mono
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
+
+        # Normalize
+        waveform = normalize_waveform(waveform)
+
+        return waveform.squeeze(0)  # Return as 1D tensor
+
+    def transform_audio_segment(self, audio_segment: torch.Tensor) -> torch.Tensor:
+        """Transform audio segment to spectrogram (for inference)."""
+        # Ensure correct length
+        if audio_segment.numel() < self.segment_samples:
+            pad_length = self.segment_samples - audio_segment.numel()
+            audio_segment = F.pad(audio_segment, (0, pad_length))
+        elif audio_segment.numel() > self.segment_samples:
+            audio_segment = audio_segment[: self.segment_samples]
+
+        # Add channel dimension for transform
+        audio_segment = audio_segment.unsqueeze(0)
+
+        # Apply mel transform (same as training)
+        melspec = self.transform(audio_segment)
+
+        # Convert to mono if needed
+        if melspec.shape[0] > 1:
+            melspec = melspec.mean(dim=0, keepdim=True)
+
+        # Normalize spectrogram
+        melspec = normalize_spectrogram(melspec)
+
+        # NO augmentations for inference
+        # Return without channel dimension (n_mels, n_frames)
+        return melspec.squeeze(0)

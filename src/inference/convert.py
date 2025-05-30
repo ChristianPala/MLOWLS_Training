@@ -46,15 +46,6 @@ def main() -> None:
         print("\n🎉 Conversion completed successfully!")
         print(f"📁 ONNX model: {results['output_path']}")
 
-        if "validation" in results:
-            validation = results["validation"]
-            if validation.get("is_accurate", False):
-                max_diff = validation.get("max_difference", "unknown")
-                print(f"✅ Validation passed (max diff: {max_diff:.2e})")
-            else:
-                error_msg = validation.get("error", "Validation failed")
-                print(f"⚠️  Validation failed: {error_msg}")
-
     except Exception as e:
         print(f"\n❌ Conversion failed: {str(e)}")
         raise
