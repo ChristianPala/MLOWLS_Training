@@ -42,24 +42,17 @@ class BirdClefDataset(Dataset):
         is_train: bool = True,
         inference_mode: bool = False,
     ) -> None:
-        if inference_mode:
-            self.df = None
-            self.segments = []
-        else:
-            self.df = (
-                data_source.copy()
-                if isinstance(data_source, pd.DataFrame)
-                else pd.read_csv(data_source)
-            )
-            assert "label_idx" in self.df.columns, "DataFrame must contain 'label_idx'."
-            self.segments = self._create_segments()
+        """Initialize dataset with proper attribute order."""
 
+        # Step 1: Set basic attributes
         self.audio_dir = audio_dir
         self.config = config
         self.is_train = is_train
 
+        # Step 2: Calculate derived values that will be needed
         self.segment_samples = int(self.config.sample_rate * self.config.segment_length)
 
+        # Step 3: Initialize transforms
         self.transform = transform or get_mel_log_transform(
             sample_rate=self.config.sample_rate,
             n_fft=self.config.n_fft,
@@ -71,6 +64,19 @@ class BirdClefDataset(Dataset):
         )
 
         self.spec_augment = get_spectrogram_augmentations(is_train=self.is_train)
+
+        # Step 4: Process data (now that all dependencies are set)
+        if inference_mode:
+            self.df = None
+            self.segments = []
+        else:
+            self.df = (
+                data_source.copy()
+                if isinstance(data_source, pd.DataFrame)
+                else pd.read_csv(data_source)
+            )
+            assert "label_idx" in self.df.columns, "DataFrame must contain 'label_idx'."
+            self.segments = self._create_segments()  # Now works!
 
     @property
     def sample_rate(self) -> int:
