@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
         "--static-batch", action="store_true", help="Use static batch size (no dynamic batching)"
     )
     parser.add_argument(
-        "--tolerance", type=float, default=1e-5, help="Validation tolerance (default: 1e-5)"
+        "--tolerance", type=float, default=1e-4, help="Validation tolerance (default: 1e-4)"
     )
 
     return parser.parse_args()

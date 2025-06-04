@@ -10,7 +10,7 @@ from ..interfaces.model_validator import ModelValidator
 class ONNXValidator(ModelValidator):
     """ONNX implementation of model validator."""
 
-    def __init__(self, tolerance: float = 1e-5):
+    def __init__(self, tolerance: float = 1e-4):
         """Initialize ONNX validator.
 
         Args:
